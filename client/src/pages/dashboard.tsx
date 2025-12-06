@@ -11,6 +11,7 @@ import { RiskLegend } from "@/components/dashboard/risk-legend";
 import { WeatherDisplay } from "@/components/dashboard/weather-display";
 import { SearchLocation } from "@/components/dashboard/search-location";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UserMenu } from "@/components/auth/user-menu";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -103,6 +104,7 @@ export default function Dashboard() {
           <div className="hidden lg:block">
             <EmergencyButton />
           </div>
+          <UserMenu />
           <ThemeToggle />
           
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
