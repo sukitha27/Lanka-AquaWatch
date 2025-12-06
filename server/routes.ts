@@ -1,8 +1,16 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import axios from "axios";
-import type { WeatherData, WeatherForecast, ForecastMode } from "@shared/schema";
+import bcrypt from "bcryptjs";
+import type { WeatherData, WeatherForecast, ForecastMode, InsertUser, InsertUserPreferences, InsertFavoriteLocation, InsertWaterLevelHistory } from "@shared/schema";
+import { insertUserSchema, insertFavoriteLocationSchema } from "@shared/schema";
+
+declare module "express-session" {
+  interface SessionData {
+    userId: string;
+  }
+}
 
 const SRI_LANKA_LAT = 7.8731;
 const SRI_LANKA_LON = 80.7718;
@@ -203,6 +211,189 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching forecast:", error);
       res.status(500).json({ error: "Failed to fetch forecast data" });
+    }
+  });
+
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Invalid input", details: result.error.errors });
+      }
+
+      const { username, password, email } = result.data;
+
+      const existing = await storage.getUserByUsername(username);
+      if (existing) {
+        return res.status(409).json({ error: "Username already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({ username, password: hashedPassword, email });
+
+      await storage.createUserPreferences({ userId: user.id });
+
+      req.session.userId = user.id;
+      res.json({ id: user.id, username: user.username, email: user.email });
+    } catch (error) {
+      console.error("Error registering user:", error);
+      res.status(500).json({ error: "Failed to register user" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      req.session.userId = user.id;
+      res.json({ id: user.id, username: user.username, email: user.email });
+    } catch (error) {
+      console.error("Error logging in:", error);
+      res.status(500).json({ error: "Failed to login" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Failed to logout" });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ id: user.id, username: user.username, email: user.email });
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/user/preferences", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const prefs = await storage.getUserPreferences(req.session.userId);
+      res.json(prefs || { alertsEnabled: true, emailAlerts: false, warningThreshold: "warning", theme: "system" });
+    } catch (error) {
+      console.error("Error fetching preferences:", error);
+      res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  app.patch("/api/user/preferences", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const prefs = await storage.updateUserPreferences(req.session.userId, req.body);
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error updating preferences:", error);
+      res.status(500).json({ error: "Failed to update preferences" });
+    }
+  });
+
+  app.get("/api/user/favorites", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const favorites = await storage.getFavoriteLocations(req.session.userId);
+      res.json(favorites);
+    } catch (error) {
+      console.error("Error fetching favorites:", error);
+      res.status(500).json({ error: "Failed to fetch favorites" });
+    }
+  });
+
+  app.post("/api/user/favorites", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const favorite = await storage.addFavoriteLocation({
+        ...req.body,
+        userId: req.session.userId
+      });
+      res.json(favorite);
+    } catch (error) {
+      console.error("Error adding favorite:", error);
+      res.status(500).json({ error: "Failed to add favorite" });
+    }
+  });
+
+  app.delete("/api/user/favorites/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      await storage.removeFavoriteLocation(parseInt(req.params.id), req.session.userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing favorite:", error);
+      res.status(500).json({ error: "Failed to remove favorite" });
+    }
+  });
+
+  app.get("/api/stations/:id/history", async (req, res) => {
+    try {
+      const hours = parseInt(req.query.hours as string) || 24;
+      const history = await storage.getWaterLevelHistory(req.params.id, hours);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching history:", error);
+      res.status(500).json({ error: "Failed to fetch water level history" });
+    }
+  });
+
+  app.post("/api/stations/:id/record", async (req, res) => {
+    try {
+      const station = await storage.getRiverStation(req.params.id);
+      if (!station) {
+        return res.status(404).json({ error: "Station not found" });
+      }
+
+      const record = await storage.recordWaterLevel({
+        stationId: req.params.id,
+        level: station.currentLevel,
+        status: station.status,
+        trend: station.trend
+      });
+      res.json(record);
+    } catch (error) {
+      console.error("Error recording water level:", error);
+      res.status(500).json({ error: "Failed to record water level" });
     }
   });
 

@@ -1,10 +1,39 @@
-import { type User, type InsertUser, type RiverStation, type FloodRiskZone, type HazardAlert, type NewsItem, type WeatherData, type WeatherForecast } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, desc, and, gte } from "drizzle-orm";
+import { 
+  users, 
+  userPreferences, 
+  favoriteLocations, 
+  waterLevelHistory,
+  type User, 
+  type InsertUser, 
+  type UserPreferences,
+  type InsertUserPreferences,
+  type FavoriteLocation,
+  type InsertFavoriteLocation,
+  type WaterLevelHistory,
+  type InsertWaterLevelHistory,
+  type RiverStation, 
+  type FloodRiskZone, 
+  type HazardAlert, 
+  type NewsItem
+} from "@shared/schema";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  createUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences>;
+  updateUserPreferences(userId: string, prefs: Partial<InsertUserPreferences>): Promise<UserPreferences | undefined>;
+  
+  getFavoriteLocations(userId: string): Promise<FavoriteLocation[]>;
+  addFavoriteLocation(fav: InsertFavoriteLocation): Promise<FavoriteLocation>;
+  removeFavoriteLocation(id: number, userId: string): Promise<boolean>;
+  
+  getWaterLevelHistory(stationId: string, hours?: number): Promise<WaterLevelHistory[]>;
+  recordWaterLevel(record: InsertWaterLevelHistory): Promise<WaterLevelHistory>;
   
   getRiverStations(): Promise<RiverStation[]>;
   getRiverStation(id: string): Promise<RiverStation | undefined>;
@@ -311,28 +340,69 @@ const newsItems: NewsItem[] = [
   }
 ];
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+    return prefs;
+  }
+
+  async createUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences> {
+    const [result] = await db.insert(userPreferences).values(prefs).returning();
+    return result;
+  }
+
+  async updateUserPreferences(userId: string, prefs: Partial<InsertUserPreferences>): Promise<UserPreferences | undefined> {
+    const [result] = await db.update(userPreferences)
+      .set(prefs)
+      .where(eq(userPreferences.userId, userId))
+      .returning();
+    return result;
+  }
+
+  async getFavoriteLocations(userId: string): Promise<FavoriteLocation[]> {
+    return db.select().from(favoriteLocations).where(eq(favoriteLocations.userId, userId));
+  }
+
+  async addFavoriteLocation(fav: InsertFavoriteLocation): Promise<FavoriteLocation> {
+    const [result] = await db.insert(favoriteLocations).values(fav).returning();
+    return result;
+  }
+
+  async removeFavoriteLocation(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(favoriteLocations)
+      .where(and(eq(favoriteLocations.id, id), eq(favoriteLocations.userId, userId)));
+    return true;
+  }
+
+  async getWaterLevelHistory(stationId: string, hours: number = 24): Promise<WaterLevelHistory[]> {
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    return db.select()
+      .from(waterLevelHistory)
+      .where(and(
+        eq(waterLevelHistory.stationId, stationId),
+        gte(waterLevelHistory.recordedAt, since)
+      ))
+      .orderBy(desc(waterLevelHistory.recordedAt));
+  }
+
+  async recordWaterLevel(record: InsertWaterLevelHistory): Promise<WaterLevelHistory> {
+    const [result] = await db.insert(waterLevelHistory).values(record).returning();
+    return result;
   }
 
   async getRiverStations(): Promise<RiverStation[]> {
@@ -359,4 +429,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

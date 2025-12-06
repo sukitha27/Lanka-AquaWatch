@@ -12,7 +12,7 @@ import { WeatherDisplay } from "@/components/dashboard/weather-display";
 import { SearchLocation } from "@/components/dashboard/search-location";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Droplets, 
@@ -111,7 +111,8 @@ export default function Dashboard() {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[320px] p-0">
+            <SheetContent side="right" className="w-[320px] p-0" aria-describedby={undefined}>
+              <SheetTitle className="sr-only">Dashboard Menu</SheetTitle>
               <div className="flex flex-col h-full">
                 <div className="p-4 border-b">
                   <h2 className="font-semibold">Dashboard Menu</h2>

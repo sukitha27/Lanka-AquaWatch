@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, real, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, real, timestamp, integer, boolean, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -7,15 +7,67 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  email: text("email"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  alertsEnabled: boolean("alerts_enabled").default(true),
+  emailAlerts: boolean("email_alerts").default(false),
+  warningThreshold: text("warning_threshold").default("warning"),
+  preferredDistricts: text("preferred_districts").array(),
+  theme: text("theme").default("system"),
+});
+
+export const favoriteLocations = pgTable("favorite_locations", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  stationId: text("station_id").notNull(),
+  name: text("name").notNull(),
+  latitude: real("latitude").notNull(),
+  longitude: real("longitude").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const waterLevelHistory = pgTable("water_level_history", {
+  id: serial("id").primaryKey(),
+  stationId: text("station_id").notNull(),
+  level: real("level").notNull(),
+  status: text("status").notNull(),
+  trend: text("trend").notNull(),
+  recordedAt: timestamp("recorded_at").defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  email: true,
+});
+
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
+  id: true,
+});
+
+export const insertFavoriteLocationSchema = createInsertSchema(favoriteLocations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWaterLevelHistorySchema = createInsertSchema(waterLevelHistory).omit({
+  id: true,
+  recordedAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type UserPreferences = typeof userPreferences.$inferSelect;
+export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
+export type FavoriteLocation = typeof favoriteLocations.$inferSelect;
+export type InsertFavoriteLocation = z.infer<typeof insertFavoriteLocationSchema>;
+export type WaterLevelHistory = typeof waterLevelHistory.$inferSelect;
+export type InsertWaterLevelHistory = z.infer<typeof insertWaterLevelHistorySchema>;
 
 export type WeatherLayer = 
   | "rainfall" 
