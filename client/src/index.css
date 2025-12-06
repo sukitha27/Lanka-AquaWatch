@@ -43,9 +43,9 @@
   --chart-3: 175 65% 35%;
   --chart-4: 160 55% 32%;
   --chart-5: 145 50% 30%;
-  --font-sans: Open Sans, sans-serif;
+  --font-sans: Inter, system-ui, sans-serif;
   --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
+  --font-mono: JetBrains Mono, monospace;
   --radius: .5rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(210 6% 12% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(210 6% 12% / 0.00);
@@ -173,6 +173,93 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+}
+
+/* Leaflet Map Styles */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: hsl(var(--background));
+}
+
+.leaflet-popup-content-wrapper {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.leaflet-popup-tip {
+  background: hsl(var(--card));
+}
+
+.leaflet-popup-close-button {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: hsl(var(--foreground)) !important;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.1) !important;
+}
+
+.leaflet-control-zoom a {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: hsl(var(--accent)) !important;
+}
+
+.leaflet-control-zoom-in {
+  border-radius: 0.375rem 0.375rem 0 0 !important;
+}
+
+.leaflet-control-zoom-out {
+  border-radius: 0 0 0.375rem 0.375rem !important;
+}
+
+.custom-station-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Dark mode specific Leaflet styles */
+.dark .leaflet-container {
+  background: hsl(var(--background));
+}
+
+.dark .leaflet-tile {
+  filter: brightness(0.85) contrast(1.1);
+}
+
+.dark .leaflet-control-attribution {
+  background: hsl(var(--card) / 0.9) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.dark .leaflet-control-attribution a {
+  color: hsl(var(--chart-1)) !important;
+}
+
+/* Pulsing animation for live indicator */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
 }
 
 /**
