@@ -5,11 +5,13 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "build": "npm run db:push && vite build",
-    "start": "cross-env NODE_ENV=production node dist/index.cjs",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "tsc --outDir dist --module commonjs",
+    "start": "cross-env NODE_ENV=production node dist/server/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "postinstall": "npm run db:push"
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
